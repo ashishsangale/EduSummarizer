@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic-settings
+pymongo
+python-dotenv
+httpx
+faster-whisper
+torch>=2.4
+transformers>=4.41,<4.58
+accelerate>=0.33
+sentence-transformers>=3.0,<4
+faiss-cpu
+numpy

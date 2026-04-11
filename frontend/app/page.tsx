@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   askSummary,
   indexSummary,
@@ -12,6 +12,9 @@ import {
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+  const [recordingUrl, setRecordingUrl] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
   const [summaries, setSummaries] = useState<SummaryItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>("");
   const [question, setQuestion] = useState("");
@@ -19,6 +22,9 @@ export default function Home() {
   const [useRetrieval, setUseRetrieval] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const selectedSummary = useMemo(
     () => summaries.find((item) => item.filename === selectedFile),
@@ -36,6 +42,79 @@ export default function Home() {
   useEffect(() => {
     loadSummaries().catch((err: Error) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordingUrl) {
+        URL.revokeObjectURL(recordingUrl);
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [recordingUrl]);
+
+  async function handleStartRecording() {
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mediaStreamRef.current = stream;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setRecordingBlob(blob);
+        if (recordingUrl) {
+          URL.revokeObjectURL(recordingUrl);
+        }
+        setRecordingUrl(URL.createObjectURL(blob));
+        setIsRecording(false);
+
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+          mediaStreamRef.current = null;
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      setStatus("Recording in progress...");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to start recording");
+    }
+  }
+
+  function handleStopRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+    recorder.stop();
+    setStatus("Recording captured. You can now summarize it.");
+  }
+
+  function handleUseRecording() {
+    if (!recordingBlob) {
+      setError("No recording available yet.");
+      return;
+    }
+
+    const timestamp = Date.now();
+    const recordedFile = new File([recordingBlob], `recorded_${timestamp}.webm`, {
+      type: recordingBlob.type || "audio/webm",
+    });
+    setFile(recordedFile);
+    setStatus(`Selected recording: ${recordedFile.name}`);
+    setError("");
+  }
 
   async function handleUpload(event: FormEvent) {
     event.preventDefault();
@@ -118,6 +197,20 @@ export default function Home() {
             <button type="submit">Transcribe & Summarize</button>
           </div>
         </form>
+        <hr />
+        <h3>Record Audio</h3>
+        <div className="row">
+          <button type="button" onClick={handleStartRecording} disabled={isRecording}>
+            Start Recording
+          </button>
+          <button type="button" onClick={handleStopRecording} disabled={!isRecording}>
+            Stop Recording
+          </button>
+          <button type="button" onClick={handleUseRecording} disabled={!recordingBlob}>
+            Use Recording
+          </button>
+        </div>
+        {recordingUrl && <audio controls src={recordingUrl} />}
         {status && <p className="muted">{status}</p>}
       </section>
 

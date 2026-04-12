@@ -41,3 +41,16 @@ class SummaryRepository:
     def delete_summary(self, filename: str) -> bool:
         result = self._collection.delete_one({"filename": filename})
         return result.deleted_count > 0
+
+    def rename_summary(self, old_filename: str, new_filename: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        result = self._collection.update_one(
+            {"filename": old_filename},
+            {
+                "$set": {
+                    "filename": new_filename,
+                    "updated_at": now,
+                }
+            },
+        )
+        return result.modified_count > 0

@@ -12,6 +12,8 @@ from backend.db import SummaryRepository
 from backend.models import (
     AskRequest,
     AskResponse,
+    RenameSummaryRequest,
+    RenameSummaryResponse,
     RetrievalIndexResponse,
     SummaryItem,
     TranscribeSummarizeResponse,
@@ -104,6 +106,28 @@ def delete_summary(filename: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="Summary not found")
     retrieval_service.delete_index_files(filename)
     return {"status": "deleted", "filename": filename}
+
+
+@router.patch("/{filename}/rename", response_model=RenameSummaryResponse)
+def rename_summary(filename: str, request: RenameSummaryRequest) -> RenameSummaryResponse:
+    item = repo.get_summary(filename)
+    if not item:
+        raise HTTPException(status_code=404, detail="Summary not found")
+
+    new_filename = _sanitize_filename(request.new_name)
+    if new_filename == filename:
+        return RenameSummaryResponse(old_filename=filename, new_filename=new_filename)
+
+    conflict = repo.get_summary(new_filename)
+    if conflict:
+        raise HTTPException(status_code=409, detail="A summary with this name already exists")
+
+    renamed = repo.rename_summary(filename, new_filename)
+    if not renamed:
+        raise HTTPException(status_code=500, detail="Unable to rename summary")
+
+    retrieval_service.rename_index_files(filename, new_filename)
+    return RenameSummaryResponse(old_filename=filename, new_filename=new_filename)
 
 
 @router.post("/{filename}/ask", response_model=AskResponse)

@@ -33,5 +33,5 @@ cd ..
 
 ## Notes
 
-- Legacy Streamlit files remain in repo for reference during migration.
+- Legacy Streamlit files are archived under `legacy/` for reference.
 - Set frontend API URL in `frontend/.env.local` from `frontend/.env.example` if needed.

@@ -90,6 +90,17 @@ class RetrievalService:
                 removed += 1
         return removed
 
+    def rename_index_files(self, old_filename: str, new_filename: str) -> int:
+        renamed = 0
+        for old_path, new_path in (
+            (self._index_path(old_filename), self._index_path(new_filename)),
+            (self._meta_path(old_filename), self._meta_path(new_filename)),
+        ):
+            if os.path.exists(old_path):
+                os.replace(old_path, new_path)
+                renamed += 1
+        return renamed
+
     def index_summary(self, filename: str, summary_text: str) -> int:
         chunks = self._chunk_text(summary_text)
         # Ensure a re-index replaces previous artifacts for the same filename.

@@ -44,3 +44,12 @@ class TranscribeSummarizeResponse(BaseModel):
 class RetrievalIndexResponse(BaseModel):
     filename: str
     chunks_indexed: int
+
+
+class RenameSummaryRequest(BaseModel):
+    new_name: str = Field(min_length=1)
+
+
+class RenameSummaryResponse(BaseModel):
+    old_filename: str
+    new_filename: str

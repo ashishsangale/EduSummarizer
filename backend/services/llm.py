@@ -50,10 +50,22 @@ class LlmService:
             return self._fallback_summarize(transcription)
 
         return self._chat(
-            system_prompt="You are a helpful assistant that summarizes lecture transcriptions clearly and concisely.",
+            system_prompt=(
+                "You are an expert academic note-taking assistant. "
+                "Create accurate, structured summaries from lecture transcripts. "
+                "Prioritize conceptual clarity, key mechanisms, definitions, and outcomes. "
+                "Do not invent details not supported by the transcript. "
+                "If parts are unclear, label them as uncertain rather than guessing. "
+                "Keep language concise and student-friendly."
+            ),
             user_prompt=(
-                "Summarize the following lecture transcription. "
-                "Use concise bullet points with key concepts and outcomes.\n\n"
+                "Summarize the lecture transcription below. Format the output with these sections: "
+                "1) Lecture Title Guess (short), "
+                "2) Key Ideas (5-10 bullets), "
+                "3) Definitions/Formulas/Terms (bullets), "
+                "4) Important Examples (bullets), "
+                "5) Quick Revision (3 bullets). "
+                "Keep it compact and faithful to the transcript.\n\n"
                 f"{transcription}"
             ),
         )
@@ -63,8 +75,24 @@ class LlmService:
             return self._fallback_answer(summary, question)
 
         return self._chat(
-            system_prompt="You answer questions based only on provided context. If context is insufficient, say so clearly.",
-            user_prompt=f"Summary:\n{summary}\n\nQuestion: {question}",
+            system_prompt=(
+                "You are an AI educational assistant designed to help students understand lecture material. "
+                "Use only the provided lecture context and do not use external knowledge. "
+                "If the context is insufficient, reply exactly: \"The provided context does not contain enough information to answer this question.\" "
+                "Be clear, accurate, structured, and supportive. "
+                "Teach concepts instead of giving only short answers. "
+                "Use step-by-step reasoning when helpful, and ask for clarification if the question is ambiguous. "
+                "If the question is conceptual, explain the concept first, then answer. "
+                "If the question is factual, answer directly and concisely. "
+                "Always follow this output structure unless context is insufficient: "
+                "1) Direct Answer, 2) Explanation (if needed), 3) Key Takeaway (1-2 lines), "
+                "4) Optional Example from lecture, 5) Optional Follow-up question."
+            ),
+            user_prompt=(
+                "Answer using only this lecture summary context. "
+                "If context is insufficient, return the exact fallback sentence.\n\n"
+                f"Summary:\n{summary}\n\nQuestion: {question}"
+            ),
         )
 
     def answer_with_context(self, contexts: list[str], question: str) -> str:
@@ -73,8 +101,24 @@ class LlmService:
 
         context_blob = "\n\n---\n\n".join(contexts)
         return self._chat(
-            system_prompt="You are a precise study assistant. Use only the provided context.",
-            user_prompt=f"Context:\n{context_blob}\n\nQuestion: {question}",
+            system_prompt=(
+                "You are an AI educational assistant designed to help students understand lecture material. "
+                "Use only retrieved lecture context and do not use external knowledge. "
+                "If the context is insufficient, reply exactly: \"The provided context does not contain enough information to answer this question.\" "
+                "Be clear, accurate, structured, and supportive. "
+                "Teach concepts instead of giving only short answers. "
+                "Use step-by-step reasoning when helpful, and ask for clarification if the question is ambiguous. "
+                "If the question is conceptual, explain the concept first, then answer. "
+                "If the question is factual, answer directly and concisely. "
+                "Always follow this output structure unless context is insufficient: "
+                "1) Direct Answer, 2) Explanation (if needed), 3) Key Takeaway (1-2 lines), "
+                "4) Optional Example from lecture, 5) Optional Follow-up question."
+            ),
+            user_prompt=(
+                "Answer using only this retrieved lecture context. "
+                "If context is insufficient, return the exact fallback sentence.\n\n"
+                f"Context:\n{context_blob}\n\nQuestion: {question}"
+            ),
         )
 
     def _fallback_summarize(self, transcription: str) -> str:
@@ -92,7 +136,7 @@ class LlmService:
     def _fallback_answer(self, source_text: str, question: str) -> str:
         sentences = self._split_sentences(source_text)
         if not sentences:
-            return "I could not find enough context to answer this question."
+            return "The provided context does not contain enough information to answer this question."
 
         query_terms = {term for term in re.findall(r"[a-zA-Z0-9]+", question.lower()) if len(term) > 2}
         scored: list[tuple[int, str]] = []

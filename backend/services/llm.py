@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-import httpx
+import cerebras.cloud.sdk
+from cerebras.cloud.sdk import Cerebras
 
 from backend.config import settings
 
@@ -12,35 +13,46 @@ class LlmService:
         self._base_url = settings.cerebras_base_url.rstrip("/")
         self._model = settings.cerebras_chat_model
         self._api_key = settings.cerebras_api_key.strip()
+        self._client = (
+            Cerebras(api_key=self._api_key)
+            if self._api_key
+            else None
+        )
 
     def _chat(self, system_prompt: str, user_prompt: str) -> str:
         if not self._api_key:
             raise RuntimeError("CEREBRAS_API_KEY is not set")
 
-        payload = {
-            "model": self._model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.2,
-        }
+        if self._client is None:
+            raise RuntimeError("CEREBRAS_API_KEY is not set")
 
-        with httpx.Client(timeout=120.0) as client:
-            response = client.post(
-                f"{self._base_url}/chat/completions",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Content-Type": "application/json",
-                },
+        endpoint = f"{self._base_url}/chat/completions"
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.2,
             )
-            response.raise_for_status()
-            data = response.json()
+        except cerebras.cloud.sdk.APIStatusError as exc:
+            status = exc.status_code
+            detail = str(exc.response) if exc.response is not None else str(exc)
+            if status == 404:
+                raise RuntimeError(
+                    "Cerebras model not found or not accessible (404). "
+                    f"URL: {endpoint} | model: {self._model}. "
+                    "Double-check that your API key has GPT-OSS access and that the model name matches the docs. "
+                    f"Server response: {detail}"
+                ) from exc
+            raise RuntimeError(f"Cerebras request failed ({status}): {detail}") from exc
+        except cerebras.cloud.sdk.APIConnectionError as exc:
+            raise RuntimeError(f"Cerebras connection failed: {exc}") from exc
 
-        choices = data.get("choices", [])
-        message = choices[0].get("message", {}) if choices else {}
-        content = message.get("content", "").strip()
+        choices = completion.choices or []
+        message = choices[0].message if choices else None
+        content = (message.content or "").strip() if message else ""
         if not content:
             raise RuntimeError("Cerebras returned an empty response")
         return content

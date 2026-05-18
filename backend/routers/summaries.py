@@ -17,10 +17,12 @@ from backend.models import (
     RetrievalIndexResponse,
     SummaryItem,
     TranscribeSummarizeResponse,
+    YoutubeSummarizeRequest,
 )
 from backend.services.asr import AsrService
 from backend.services.llm import LlmService
 from backend.services.retrieval import RetrievalService
+from backend.services.youtube import YoutubeTranscriptService
 
 router = APIRouter(prefix="/api/v1/summaries", tags=["summaries"])
 
@@ -28,6 +30,7 @@ repo = SummaryRepository()
 asr_service = AsrService()
 llm_service = LlmService()
 retrieval_service = RetrievalService()
+youtube_service = YoutubeTranscriptService()
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +87,42 @@ def transcribe_and_summarize(file: UploadFile = File(...)) -> TranscribeSummariz
     finally:
         if os.path.exists(audio_path):
             os.remove(audio_path)
+
+
+@router.post("/from-youtube", response_model=TranscribeSummarizeResponse)
+def summarize_from_youtube(request: YoutubeSummarizeRequest) -> TranscribeSummarizeResponse:
+    try:
+        transcription, default_name = youtube_service.fetch_transcript_text(request.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to fetch YouTube transcript: {exc}") from exc
+
+    filename = _sanitize_filename(request.name) if request.name else _sanitize_filename(default_name)
+
+    try:
+        summary = llm_service.summarize_transcription(transcription)
+        if not summary:
+            raise HTTPException(status_code=422, detail="Summary is empty")
+
+        repo.upsert_summary(filename=filename, transcription=transcription, summary=summary)
+
+        try:
+            retrieval_service.index_summary(filename, summary)
+        except RuntimeError as exc:
+            logger.warning("Auto-index skipped for %s: %s", filename, exc)
+        except Exception as exc:
+            logger.exception("Auto-index failed for %s: %s", filename, exc)
+
+        return TranscribeSummarizeResponse(
+            filename=filename,
+            transcription=transcription,
+            summary=summary,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Processing failed: {exc}") from exc
 
 
 @router.get("", response_model=list[SummaryItem])

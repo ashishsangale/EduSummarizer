@@ -62,6 +62,16 @@ export async function transcribeAndSummarize(file: File): Promise<void> {
   await readJsonOrThrow<unknown>(response);
 }
 
+export async function summarizeFromYoutube(url: string, name?: string): Promise<void> {
+  const response = await fetch(`${apiBase}/api/v1/summaries/from-youtube`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, name: name?.trim() || undefined }),
+  });
+
+  await readJsonOrThrow<unknown>(response);
+}
+
 export async function askSummary(filename: string, question: string): Promise<string> {
   const response = await fetch(`${apiBase}/api/v1/summaries/${encodeURIComponent(filename)}/ask`, {
     method: "POST",

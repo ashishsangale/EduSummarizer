@@ -9,6 +9,7 @@ import {
   renameSummary,
   retrieveAsk,
   SummaryItem,
+  summarizeFromYoutube,
   transcribeAndSummarize,
 } from "../lib/api";
 
@@ -108,6 +109,8 @@ function toUserError(err: unknown, fallback: string): string {
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadName, setUploadName] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeName, setYoutubeName] = useState("");
 
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [recordingUrl, setRecordingUrl] = useState("");
@@ -363,6 +366,30 @@ export default function Home() {
     } catch (err) {
       setStatus("");
       setError(toUserError(err, "Upload failed"));
+    }
+  }
+
+  async function handleYoutubeSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setStatus("");
+
+    const trimmedUrl = youtubeUrl.trim();
+    if (!trimmedUrl) {
+      setError("Please paste a YouTube URL.");
+      return;
+    }
+
+    setStatus("Fetching transcript and summarizing");
+    try {
+      await summarizeFromYoutube(trimmedUrl, youtubeName.trim() || undefined);
+      setYoutubeUrl("");
+      setYoutubeName("");
+      await loadSummaries();
+      setStatus("Saved");
+    } catch (err) {
+      setStatus("");
+      setError(toUserError(err, "YouTube summarization failed"));
     }
   }
 
@@ -669,6 +696,32 @@ export default function Home() {
               <div className="row">
                 <button type="submit" className="btn btn-primary">
                   Transcribe and summarize
+                </button>
+              </div>
+            </form>
+
+            <form onSubmit={handleYoutubeSubmit} className="stack youtube-stack">
+              <label htmlFor="youtube-url">Or paste YouTube link</label>
+              <input
+                id="youtube-url"
+                type="text"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+
+              <label htmlFor="youtube-name">Recording name (optional)</label>
+              <input
+                id="youtube-name"
+                type="text"
+                value={youtubeName}
+                onChange={(e) => setYoutubeName(e.target.value)}
+                placeholder="Example: Organic chemistry lecture 3"
+              />
+
+              <div className="row">
+                <button type="submit" className="btn btn-primary">
+                  Summarize from YouTube
                 </button>
               </div>
             </form>

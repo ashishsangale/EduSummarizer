@@ -1,8 +1,13 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_ENV_FILE = Path(__file__).resolve().parent / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "EduSummarizer API"
     app_env: str = "dev"
@@ -18,7 +23,9 @@ class Settings(BaseSettings):
 
     cerebras_api_key: str = ""
     cerebras_base_url: str = "https://api.cerebras.ai/v1"
-    cerebras_chat_model: str = "llama-3.1-8b"
+    cerebras_chat_model: str = "gpt-oss-120b"
+    cerebras_max_completion_tokens: int = 32768
+    cerebras_reasoning_effort: str = "medium"
 
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
 

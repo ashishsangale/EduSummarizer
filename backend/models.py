@@ -41,6 +41,11 @@ class TranscribeSummarizeResponse(BaseModel):
     summary: str
 
 
+class YoutubeSummarizeRequest(BaseModel):
+    url: str = Field(min_length=1)
+    name: str | None = None
+
+
 class RetrievalIndexResponse(BaseModel):
     filename: str
     chunks_indexed: int

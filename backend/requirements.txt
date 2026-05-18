@@ -4,7 +4,7 @@ python-multipart
 pydantic-settings
 pymongo
 python-dotenv
-httpx
+cerebras_cloud_sdk
 faster-whisper
 torch>=2.4
 transformers>=4.41,<4.58
@@ -12,3 +12,4 @@ accelerate>=0.33
 sentence-transformers>=3.0,<4
 faiss-cpu
 numpy
+youtube-transcript-api
